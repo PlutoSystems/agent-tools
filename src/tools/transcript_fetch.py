@@ -13,7 +13,8 @@ from azure.identity import (
 
 load_dotenv()
 
-AUTH_RECORD_PATH = ".local/auth_record.json"
+ROOT = os.getenv("LOCAL_STORE_PATH", ".local")
+AUTH_RECORD_PATH = os.path.join(ROOT, "ms_auth_record.json")
 CLIENT_ID = os.getenv("MS_CLIENT_ID")
 SCOPES = [
     "https://graph.microsoft.com/OnlineMeetings.Read",
@@ -49,6 +50,9 @@ def get_silent_credential():
 
 
 def fetch_transcript(join_web_url, output_path) -> str:
+    if not CLIENT_ID:
+        return "Error: MS_CLIENT_ID not set in environment variables."
+
     print(f"--- Authenticating ---")
     credential = get_silent_credential()
 
@@ -57,6 +61,7 @@ def fetch_transcript(join_web_url, output_path) -> str:
     access_token = token_obj.token
 
     record = credential.authenticate(scopes=SCOPES)
+    os.makedirs(os.path.dirname(os.path.abspath(AUTH_RECORD_PATH)), exist_ok=True)
     with open(AUTH_RECORD_PATH, "w") as f:
         json.dump(record.serialize(), f)
         print(f"DEBUG: Saved user identity to {AUTH_RECORD_PATH}")

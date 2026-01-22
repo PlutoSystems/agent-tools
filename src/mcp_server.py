@@ -6,7 +6,7 @@ mcp = FastMCP("Pluto Shared MCP Tools")
 
 
 @mcp.tool()
-def fetch_transcript(join_url: str, output_path: str) -> str:
+def fetch_transcript_tool(join_url: str, output_path: str) -> str:
     """
     Downloads and saves a Microsoft Teams meeting transcript.
 
