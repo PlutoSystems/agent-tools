@@ -1,3 +1,4 @@
+import json
 from mcp.server.fastmcp import FastMCP
 from tools.transcript_fetch import fetch_transcript
 from tools.hubspot.search_contacts import search_contacts
@@ -17,6 +18,11 @@ from tools.hubspot.add_note import add_note
 from tools.hubspot.log_call import log_call
 from tools.hubspot.log_meeting import log_meeting
 from tools.hubspot.list_users import list_users
+from tools.hubspot.search_meetings import search_meetings
+from tools.hubspot.search_calls import search_calls
+from tools.hubspot.search_notes import search_notes
+from tools.hubspot.search_emails import search_emails
+from tools.parse_email import parse_email
 
 # Create the server
 mcp = FastMCP("Pluto Shared MCP Tools")
@@ -453,6 +459,134 @@ def hubspot_list_users() -> str:
     Use these IDs for owner_id and attendee_ids in hubspot_log_meeting.
     """
     return list_users()
+
+
+@mcp.tool()
+def hubspot_search_meetings(
+    contact_id: str | None = None,
+    company_id: str | None = None,
+    deal_id: str | None = None,
+    outcome: str | None = None,
+    after_date: str | None = None,
+    before_date: str | None = None,
+    limit: int = 10,
+) -> str:
+    """
+    Search HubSpot meetings by association or filters.
+
+    Args:
+        contact_id: Find meetings associated with this contact
+        company_id: Find meetings associated with this company
+        deal_id: Find meetings associated with this project
+        outcome: Filter by outcome (SCHEDULED, COMPLETED, RESCHEDULED, NO_SHOW, CANCELLED)
+        after_date: Only meetings after this date (YYYY-MM-DD)
+        before_date: Only meetings before this date (YYYY-MM-DD)
+        limit: Max results (default 10)
+
+    At least one filter must be provided.
+    """
+    return search_meetings(
+        contact_id, company_id, deal_id, outcome, after_date, before_date, limit
+    )
+
+
+@mcp.tool()
+def hubspot_search_calls(
+    contact_id: str | None = None,
+    company_id: str | None = None,
+    deal_id: str | None = None,
+    after_date: str | None = None,
+    before_date: str | None = None,
+    limit: int = 10,
+) -> str:
+    """
+    Search HubSpot calls by association or date range.
+
+    Args:
+        contact_id: Find calls associated with this contact
+        company_id: Find calls associated with this company
+        deal_id: Find calls associated with this project
+        after_date: Only calls after this date (YYYY-MM-DD)
+        before_date: Only calls before this date (YYYY-MM-DD)
+        limit: Max results (default 10)
+
+    At least one filter must be provided.
+    """
+    return search_calls(contact_id, company_id, deal_id, after_date, before_date, limit)
+
+
+@mcp.tool()
+def hubspot_search_notes(
+    contact_id: str | None = None,
+    company_id: str | None = None,
+    deal_id: str | None = None,
+    after_date: str | None = None,
+    before_date: str | None = None,
+    limit: int = 10,
+) -> str:
+    """
+    Search HubSpot notes by association or date range.
+
+    Args:
+        contact_id: Find notes associated with this contact
+        company_id: Find notes associated with this company
+        deal_id: Find notes associated with this project
+        after_date: Only notes after this date (YYYY-MM-DD)
+        before_date: Only notes before this date (YYYY-MM-DD)
+        limit: Max results (default 10)
+
+    At least one filter must be provided.
+    """
+    return search_notes(contact_id, company_id, deal_id, after_date, before_date, limit)
+
+
+@mcp.tool()
+def hubspot_search_emails(
+    contact_id: str | None = None,
+    company_id: str | None = None,
+    subject: str | None = None,
+    after_date: str | None = None,
+    before_date: str | None = None,
+    limit: int = 10,
+) -> str:
+    """
+    Search HubSpot emails by association, subject, or date range.
+
+    Args:
+        contact_id: Find emails associated with this contact
+        company_id: Find emails associated with this company
+        subject: Search by email subject (partial match)
+        after_date: Only emails after this date (YYYY-MM-DD)
+        before_date: Only emails before this date (YYYY-MM-DD)
+        limit: Max results (default 10)
+
+    At least one filter must be provided.
+    """
+    return search_emails(
+        contact_id, company_id, subject, after_date, before_date, limit
+    )
+
+
+@mcp.tool()
+def parse_email_file(file_path: str) -> str:
+    """
+    Parse a .msg email file and extract its contents.
+
+    Extracts sender, recipients (to/cc/bcc), subject, body, and attachments
+    from a Microsoft Outlook .msg file. Long URLs in the body are replaced
+    with [LINK]. Attachment content is returned as base64.
+
+    Args:
+        file_path: Absolute path to the .msg file to parse.
+
+    Returns:
+        JSON string with keys: sentOn (epoch ms), from, to, cc, bcc, subject, body, attachments.
+    """
+    try:
+        result = parse_email(file_path)
+        return json.dumps(result, default=str)
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 if __name__ == "__main__":

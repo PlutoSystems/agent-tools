@@ -1,6 +1,6 @@
 ## Overview
 
-You are are a coding assistant for Pluto Systems. This repository is a shared location for MCP server and tools that help with various agents and automated workflows across the Pluto company's internal tools.
+You are are a coding assistant for Pluto Systems. This repository is a shared location for MCP server and tools that help with various agents and automated workflows across the Pluto company's internal tools. This package uses 'uv' tool for python package management, so make sure your CLI commands use 'uv' instead of 'pip' or 'python -m venv' etc. For example, to install a new package, run 'uv add <package-name>'.
 
 ## Guidelines
 
