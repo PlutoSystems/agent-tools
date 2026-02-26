@@ -586,5 +586,40 @@ if "hubspot" not in EXCLUDED:
         )
 
 
+# --- Conversion tools (excludable with --exclude conversions) ---
+
+if "conversions" not in EXCLUDED:
+    from tools.conversions.pdf_to_markdown import pdf_to_markdown
+    from tools.conversions.docx_to_markdown import docx_to_markdown
+
+    @mcp.tool()
+    def convert_pdf_to_markdown(file_path: str, output_path: str | None = None) -> str:
+        """
+        Convert a PDF file to Markdown text using markitdown.
+
+        Args:
+            file_path: Absolute path to the .pdf file to convert.
+            output_path: Optional path to save the markdown output. If omitted, returns the markdown directly.
+
+        Returns:
+            The converted markdown text, or a confirmation message if output_path was provided.
+        """
+        return pdf_to_markdown(file_path, output_path)
+
+    @mcp.tool()
+    def convert_docx_to_markdown(file_path: str, output_path: str | None = None) -> str:
+        """
+        Convert a Word document (.doc/.docx) to Markdown text using markitdown.
+
+        Args:
+            file_path: Absolute path to the .doc or .docx file to convert.
+            output_path: Optional path to save the markdown output. If omitted, returns the markdown directly.
+
+        Returns:
+            The converted markdown text, or a confirmation message if output_path was provided.
+        """
+        return docx_to_markdown(file_path, output_path)
+
+
 if __name__ == "__main__":
     mcp.run()
