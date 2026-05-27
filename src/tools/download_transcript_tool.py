@@ -13,7 +13,8 @@ from azure.identity import (
 
 load_dotenv()
 
-ROOT = os.getenv("LOCAL_STORE_PATH", ".local")
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+ROOT = os.getenv("LOCAL_STORE_PATH", os.path.join(_REPO_ROOT, ".local"))
 AUTH_RECORD_PATH = os.path.join(ROOT, "ms_auth_record.json")
 CLIENT_ID = os.getenv("MS_CLIENT_ID")
 SCOPES = [
@@ -49,7 +50,7 @@ def get_silent_credential():
     return credential
 
 
-def fetch_transcript(join_web_url, output_path) -> str:
+def fetch_transcript(join_web_url: str, output_path: str | None = None) -> str:
     if not CLIENT_ID:
         return "Error: MS_CLIENT_ID not set in environment variables."
 
@@ -135,19 +136,33 @@ def fetch_transcript(join_web_url, output_path) -> str:
 
     transcript_text = "\n".join(cleaned_lines)
 
-    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    safe_subject = "".join(
+        c if c.isalnum() or c in " -_" else "_" for c in meeting_subject
+    ).strip()
+    filename = f"{safe_subject}_{transcript_id[:8]}.txt"
+    local_path = os.path.join(ROOT, "transcripts", filename)
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    with open(local_path, "w", encoding="utf-8") as f:
         f.write(transcript_text)
 
-    return f"\n✓ Successfully saved transcript to: {output_path}"
+    saved_paths = [local_path]
+
+    if output_path:
+        output_path = os.path.abspath(output_path)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(transcript_text)
+        saved_paths.append(output_path)
+
+    return f"\n\u2713 Successfully saved transcript to: {', '.join(saved_paths)}"
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: python transcript_tool.py <JOIN_WEB_URL> <OUTPUT_PATH>")
+    if len(sys.argv) < 2:
+        print("Usage: python transcript_tool.py <JOIN_WEB_URL> [OUTPUT_PATH]")
         sys.exit(1)
 
     join_web_url = sys.argv[1]
-    output_path = sys.argv[2]
+    output_path = sys.argv[2] if len(sys.argv) > 2 else None
     print(fetch_transcript(join_web_url, output_path))

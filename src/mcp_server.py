@@ -1,8 +1,16 @@
 import sys
 import json
+from typing import Literal
 from mcp.server.fastmcp import FastMCP
-from tools.parse_email import parse_email
-from tools.transcript_fetch import fetch_transcript
+from tools.parse_email_tool import parse_email
+from tools.download_transcript_tool import fetch_transcript
+from tools.download_recording_tool import download_recording as _download_recording
+from tools.analyze_qa_recording_tool import (
+    analyze_qa_recording as _analyze_qa_recording,
+)
+from tools.analyze_content_recording_tool import (
+    analyze_content_recording as _analyze_content_recording,
+)
 
 EXCLUDED = set()
 i = 1
@@ -17,18 +25,18 @@ mcp = FastMCP("Pluto Shared MCP Tools")
 
 
 @mcp.tool()
-def fetch_transcript_tool(join_url: str, output_path: str) -> str:
+def download_transcript(join_url: str, output_path: str = "") -> str:
     """
     Downloads and saves a Microsoft Teams meeting transcript.
 
     This tool authenticates with Microsoft Graph API (requires interactive browser
     authentication on first use), retrieves the meeting transcript, cleans the VTT
-    format to plain text with speaker names, and saves it to the specified path.
+    format to plain text with speaker names, and saves it to .local/transcripts/.
+    Optionally also saves to output_path if provided.
 
     Args:
         join_url: The Teams meeting Join Web URL (e.g., from meeting invite or calendar)
-        output_path: Absolute file path where the cleaned transcript should be saved (e.g.,
-                    'C:/Users/user/Desktop/meeting.txt'). Parent directories will be created if needed.
+        output_path: Optional file path to also save the transcript to.
 
     Returns:
         Success message with the saved file path, or error message if the operation fails.
@@ -38,8 +46,86 @@ def fetch_transcript_tool(join_url: str, output_path: str) -> str:
         - Auth credentials are cached in .local/auth_record.json for subsequent runs
     """
     try:
-        content = fetch_transcript(join_url, output_path)
+        content = fetch_transcript(join_url, output_path or None)
         return content
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
+@mcp.tool()
+def download_recording(join_url: str) -> str:
+    """
+    Downloads a Microsoft Teams meeting recording as an MP4 file.
+
+    Authenticates with Microsoft Graph API, retrieves the meeting recording,
+    and saves it to the .local/ directory. Returns metadata including file name,
+    size, and meeting details.
+
+    Args:
+        join_url: The Teams meeting Join Web URL (e.g., from meeting invite or calendar).
+
+    Returns:
+        Success message with file path and metadata, or error message if the operation fails.
+    """
+    try:
+        return _download_recording(join_url)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
+@mcp.tool()
+def analyze_qa_recording(
+    video_path: str, transcript_path: str, meeting_name: str = ""
+) -> str:
+    """
+    Analyze a Teams meeting recording for UX issues, bugs, and feature requests.
+
+    Uses Gemini Flash to watch the video and identify every mentioned issue. For each
+    issue found, extracts video clips and screenshots at the relevant timestamps.
+
+    Args:
+        video_path: Path to the MP4 recording file (e.g., from download_recording).
+        transcript_path: Path to the transcript text file for supporting evidence.
+        meeting_name: Optional name for the meeting, used to organize output folders.
+                      Defaults to the video filename if not provided.
+
+    Returns:
+        JSON with meeting_name, total_issues, token usage, and an issues array.
+        Each issue contains: category, quote, explanation, start_time, end_time,
+        evidence_source,
+        clip (file path to video clip), and screenshots (list of image file paths).
+    """
+    try:
+        return _analyze_qa_recording(video_path, transcript_path, meeting_name or None)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
+@mcp.tool()
+def analyze_content_recording(
+    video_path: str, transcript_path: str, meeting_name: str = ""
+) -> str:
+    """
+    Analyze a recording for marketing and sales content feedback.
+
+    Uses Gemini Flash to organize non-technical content ideas into a simple list and
+    extracts supporting clips/screenshots for each idea.
+
+    Args:
+        video_path: Path to the MP4 recording file.
+        transcript_path: Path to the transcript text file for supporting evidence.
+        meeting_name: Optional name for organizing output folders.
+
+    Returns:
+        JSON with meeting_name, total_ideas, token usage, and ideas array.
+        Each idea contains: category, title, summary, quote, start_time, end_time,
+        evidence_source,
+        clip (file path), and screenshots (list of file paths).
+    """
+    try:
+        return _analyze_content_recording(
+            video_path, transcript_path, meeting_name or None
+        )
     except Exception as e:
         return f"Error: {str(e)}"
 
@@ -619,6 +705,105 @@ if "conversions" not in EXCLUDED:
             The converted markdown text, or a confirmation message if output_path was provided.
         """
         return docx_to_markdown(file_path, output_path)
+
+
+# --- ClickUp tools (excludable with --exclude clickup) ---
+
+if "clickup" not in EXCLUDED:
+    from tools.clickup.search_structure import search_structure as _search_structure
+    from tools.clickup.resolve_url import resolve_clickup_url as _resolve_clickup_url
+    from tools.clickup.task_create import create_task
+    from tools.clickup.task_add_attachment import add_attachment
+
+    @mcp.tool()
+    def clickup_search_structure(
+        entity_type: Literal["Space", "Folder", "List", "Document"] | None = None,
+        id: str | None = None,
+        name: str | None = None,
+        query: str | None = None,
+        force_refresh: bool = False,
+    ) -> str:
+        """
+        Search the ClickUp workspace hierarchy to find a space, folder, list, or doc.
+
+        Use this FIRST before any other ClickUp operation when you need a list_id, folder_id,
+        or space_id. The hierarchy is cached locally so this is fast — call with
+        force_refresh=True only if you think the workspace structure has changed.
+
+        Resolution order (stops at first success):
+        1. Exact ID match — use when you already have an ID from a URL or prior result
+        2. Exact name match (case-insensitive) — use when you know the precise name
+        3. Fuzzy match on `query` — returns ranked candidates when name is uncertain
+
+        Args:
+            entity_type: Optional filter — "Space", "Folder", "List", or "Document"
+            id:          Find by exact ClickUp ID (numeric string)
+            name:        Find by exact name (case-insensitive)
+            query:       Natural-language description for fuzzy matching when name is unknown
+            force_refresh: Re-fetch hierarchy from ClickUp API (bypasses cache)
+
+        Returns:
+            JSON with matched entity: { type, id, name, path } — path shows breadcrumb
+            e.g. "Engineering > Sprint > Backlog". Returns array if multiple matches found.
+        """
+        return _search_structure(entity_type, id, name, query, force_refresh)
+
+    @mcp.tool()
+    def clickup_resolve_url(url: str) -> str:
+        """
+        Resolve a ClickUp app URL to its parent hierarchy (list of IDs).
+
+        Parses the URL to extract entity IDs, calls the ClickUp View API when
+        needed to dereference view IDs, then looks up each ID in the local
+        hierarchy cache to return the full ancestor chain.
+
+        Supports all common ClickUp URL types:
+        - Folder overview (/v/o/f/{folder_id})
+        - Doc/page (/v/dc/{doc_id}/...)
+        - List views (/v/l/{view_id} or /v/l/{type}-{list_id}-{n})
+        - Board views (/v/b/{view_id} or /v/b/li/{list_id})
+
+        Args:
+            url: A ClickUp app URL (e.g. https://app.clickup.com/14254316/v/l/dk07c-60177)
+
+        Returns:
+            JSON with a "hierarchy" array of { type, id, name } objects from
+            outermost (space) to innermost (list/folder/doc).
+        """
+        return _resolve_clickup_url(url)
+
+    @mcp.tool()
+    def clickup_create_task(
+        list_id: str,
+        name: str,
+        markdown_content: str,
+        task_type: str | None = None,
+        parent: str | None = None,
+    ) -> str:
+        """
+        Create a new task in a ClickUp list.
+
+        Use clickup_search_structure to find the list_id before calling this.
+
+        Args:
+            list_id: ClickUp list ID to create the task in
+            name: Task name/title
+            markdown_content: Task description in markdown
+            task_type: Optional custom task type name (e.g. "Bug", "Feature")
+            parent: Optional parent task ID to nest this as a subtask
+        """
+        return create_task(list_id, name, markdown_content, task_type, parent)
+
+    @mcp.tool()
+    def clickup_add_attachment(task_id: str, file_path: str) -> str:
+        """
+        Upload a file as an attachment to a ClickUp task.
+
+        Args:
+            task_id: ClickUp task ID
+            file_path: Absolute path to the file to attach
+        """
+        return add_attachment(task_id, file_path)
 
 
 if __name__ == "__main__":
