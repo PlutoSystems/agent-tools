@@ -4,7 +4,7 @@ import requests
 from tools.clickup import CLICKUP_API_KEY, BASE_URL, headers, get_task_type_id
 
 
-def task_create(
+def create_task(
     list_id: str,
     name: str,
     markdown_content: str,
@@ -54,11 +54,11 @@ def task_create(
 if __name__ == "__main__":
     if len(sys.argv) < 4:
         print(
-            "Usage: python task_create.py <list_id> <name> <markdown_content> [task_type] [parent_id]"
+            "Usage: python create_task.py <list_id> <name> <markdown_content> [task_type] [parent_id]"
         )
         sys.exit(1)
 
-    result = task_create(
+    result = create_task(
         list_id=sys.argv[1],
         name=sys.argv[2],
         markdown_content=sys.argv[3],

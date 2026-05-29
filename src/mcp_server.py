@@ -3,8 +3,6 @@ import json
 from typing import Literal
 from mcp.server.fastmcp import FastMCP
 from tools.parse_email_tool import parse_email
-from tools.download_transcript_tool import fetch_transcript
-from tools.download_recording_tool import download_recording as _download_recording
 from tools.analyze_qa_recording_tool import (
     analyze_qa_recording as _analyze_qa_recording,
 )
@@ -22,55 +20,6 @@ while i < len(sys.argv):
         i += 1
 
 mcp = FastMCP("Pluto Shared MCP Tools")
-
-
-@mcp.tool()
-def download_transcript(join_url: str, output_path: str = "") -> str:
-    """
-    Downloads and saves a Microsoft Teams meeting transcript.
-
-    This tool authenticates with Microsoft Graph API (requires interactive browser
-    authentication on first use), retrieves the meeting transcript, cleans the VTT
-    format to plain text with speaker names, and saves it to .local/transcripts/.
-    Optionally also saves to output_path if provided.
-
-    Args:
-        join_url: The Teams meeting Join Web URL (e.g., from meeting invite or calendar)
-        output_path: Optional file path to also save the transcript to.
-
-    Returns:
-        Success message with the saved file path, or error message if the operation fails.
-
-    Notes:
-        - Requires MS_CLIENT_ID in .env file
-        - Auth credentials are cached in .local/auth_record.json for subsequent runs
-    """
-    try:
-        content = fetch_transcript(join_url, output_path or None)
-        return content
-    except Exception as e:
-        return f"Error: {str(e)}"
-
-
-@mcp.tool()
-def download_recording(join_url: str) -> str:
-    """
-    Downloads a Microsoft Teams meeting recording as an MP4 file.
-
-    Authenticates with Microsoft Graph API, retrieves the meeting recording,
-    and saves it to the .local/ directory. Returns metadata including file name,
-    size, and meeting details.
-
-    Args:
-        join_url: The Teams meeting Join Web URL (e.g., from meeting invite or calendar).
-
-    Returns:
-        Success message with file path and metadata, or error message if the operation fails.
-    """
-    try:
-        return _download_recording(join_url)
-    except Exception as e:
-        return f"Error: {str(e)}"
 
 
 @mcp.tool()
@@ -707,6 +656,149 @@ if "conversions" not in EXCLUDED:
         return docx_to_markdown(file_path, output_path)
 
 
+# --- MS Graph tools (excludable with --exclude ms_graph) ---
+
+if "ms_graph" not in EXCLUDED:
+    from tools.ms_graph.download_transcript import fetch_transcript
+    from tools.ms_graph.download_recording import (
+        download_recording as _download_recording,
+    )
+    from tools.ms_graph.list_teams import list_my_teams as _list_my_teams
+    from tools.ms_graph.list_channels import list_channels as _list_channels
+    from tools.ms_graph.list_channel_messages import (
+        list_channel_messages as _list_channel_messages,
+    )
+    from tools.ms_graph.get_channel_message import (
+        get_channel_message as _get_channel_message,
+    )
+
+    @mcp.tool()
+    def download_transcript(join_url: str, output_path: str = "") -> str:
+        """
+        Downloads and saves a Microsoft Teams meeting transcript.
+
+        This tool authenticates with Microsoft Graph API (requires interactive browser
+        authentication on first use), retrieves the meeting transcript, cleans the VTT
+        format to plain text with speaker names, and saves it to .local/transcripts/.
+        Optionally also saves to output_path if provided.
+
+        Args:
+            join_url: The Teams meeting Join Web URL (e.g., from meeting invite or calendar)
+            output_path: Optional file path to also save the transcript to.
+
+        Returns:
+            Success message with the saved file path, or error message if the operation fails.
+
+        Notes:
+            - Requires MS_CLIENT_ID in .env file
+            - Auth credentials are cached in .local/auth_record.json for subsequent runs
+        """
+        try:
+            content = fetch_transcript(join_url, output_path or None)
+            return content
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    @mcp.tool()
+    def download_recording(join_url: str) -> str:
+        """
+        Downloads a Microsoft Teams meeting recording as an MP4 file.
+
+        Authenticates with Microsoft Graph API, retrieves the meeting recording,
+        and saves it to the .local/ directory. Returns metadata including file name,
+        size, and meeting details.
+
+        Args:
+            join_url: The Teams meeting Join Web URL (e.g., from meeting invite or calendar).
+
+        Returns:
+            Success message with file path and metadata, or error message if the operation fails.
+        """
+        try:
+            return _download_recording(join_url)
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    @mcp.tool()
+    def ms_graph_list_teams() -> str:
+        """
+        List all Microsoft Teams that the authenticated user is a member of.
+
+        Returns a formatted list of teams with their name, visibility (public/private),
+        and description. Requires MS_CLIENT_ID in .env and interactive browser auth on first use.
+        """
+        try:
+            return _list_my_teams()
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    @mcp.tool()
+    def ms_graph_list_channels(team_id: str) -> str:
+        """
+        List all channels in a Microsoft Teams team.
+
+        Use ms_graph_list_teams first to get the team ID.
+
+        Args:
+            team_id: The Microsoft Teams team ID.
+
+        Returns:
+            JSON with channel count and array of channels, each with id, name,
+            description, membershipType (standard/private/shared), webUrl, and isArchived.
+        """
+        try:
+            return _list_channels(team_id)
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    @mcp.tool()
+    def ms_graph_list_channel_messages(
+        team_id: str, channel_id: str, limit: int = 20
+    ) -> str:
+        """
+        List recent posts in a Microsoft Teams channel.
+
+        Returns lightweight message summaries. Use ms_graph_get_channel_message
+        to fetch the full content and attachments for a specific message.
+
+        Args:
+            team_id: The Microsoft Teams team ID (from ms_graph_list_teams).
+            channel_id: The channel ID (from ms_graph_list_channels).
+            limit: Max number of messages to return (default 20, max 50).
+
+        Returns:
+            JSON with message count and array of messages, each with id, subject,
+            sender, createdDateTime, preview (first 200 chars), attachmentCount, replyCount.
+        """
+        try:
+            return _list_channel_messages(team_id, channel_id, limit)
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    @mcp.tool()
+    def ms_graph_get_channel_message(
+        team_id: str, channel_id: str, message_id: str
+    ) -> str:
+        """
+        Get a specific channel message with full content, replies, and file attachments.
+
+        Use ms_graph_list_channel_messages first to find the message_id.
+
+        Args:
+            team_id: The Microsoft Teams team ID.
+            channel_id: The channel ID.
+            message_id: The message ID to fetch.
+
+        Returns:
+            JSON with full message body, subject, sender, timestamp, attachments
+            (with download URLs for files), and all replies with their attachments.
+        """
+        try:
+            return _get_channel_message(team_id, channel_id, message_id)
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+
 # --- ClickUp tools (excludable with --exclude clickup) ---
 
 if "clickup" not in EXCLUDED:
@@ -714,39 +806,47 @@ if "clickup" not in EXCLUDED:
     from tools.clickup.resolve_url import resolve_clickup_url as _resolve_clickup_url
     from tools.clickup.task_create import create_task
     from tools.clickup.task_add_attachment import add_attachment
+    from tools.clickup.doc_pages import get_doc_pages as _get_doc_pages
+    from tools.clickup.doc_page_content import get_page_content as _get_page_content
 
     @mcp.tool()
     def clickup_search_structure(
         entity_type: Literal["Space", "Folder", "List", "Document"] | None = None,
-        id: str | None = None,
-        name: str | None = None,
+        keyword_search: str | None = None,
         query: str | None = None,
+        space_id: str | None = None,
         force_refresh: bool = False,
     ) -> str:
         """
-        Search the ClickUp workspace hierarchy to find a space, folder, list, or doc.
+        Search the ClickUp workspace hierarchy to find spaces, folders, lists, or docs.
 
         Use this FIRST before any other ClickUp operation when you need a list_id, folder_id,
         or space_id. The hierarchy is cached locally so this is fast — call with
         force_refresh=True only if you think the workspace structure has changed.
 
-        Resolution order (stops at first success):
-        1. Exact ID match — use when you already have an ID from a URL or prior result
-        2. Exact name match (case-insensitive) — use when you know the precise name
-        3. Fuzzy match on `query` — returns ranked candidates when name is uncertain
+        Always returns a JSON array of ALL matching results (up to 50), never a single object.
+
+        Search strategy — always try keyword_search first, only fall back to query if needed:
+          1. keyword_search — fast case-insensitive substring match against entity names.
+                              Use this first with the most specific term you have.
+          2. query          — AI-powered semantic search, results ranked by relevance.
+                              Use ONLY as a fallback when keyword_search yields nothing,
+                              or when the intent is descriptive rather than name-based.
 
         Args:
-            entity_type: Optional filter — "Space", "Folder", "List", or "Document"
-            id:          Find by exact ClickUp ID (numeric string)
-            name:        Find by exact name (case-insensitive)
-            query:       Natural-language description for fuzzy matching when name is unknown
-            force_refresh: Re-fetch hierarchy from ClickUp API (bypasses cache)
+            entity_type:    Optional filter — "Space", "Folder", "List", or "Document"
+            keyword_search: Substring to match against entity names (case-insensitive)
+            query:          Natural-language description for AI-ranked semantic matching
+            space_id:       Optional ClickUp space ID to restrict results to that space
+            force_refresh:  Re-fetch hierarchy from ClickUp API (bypasses cache)
 
         Returns:
-            JSON with matched entity: { type, id, name, path } — path shows breadcrumb
-            e.g. "Engineering > Sprint > Backlog". Returns array if multiple matches found.
+            JSON array of matched entities, each with { type, id, name, path, space_id }.
+            Path shows breadcrumb e.g. "Engineering > Sprint > Backlog".
         """
-        return _search_structure(entity_type, id, name, query, force_refresh)
+        return _search_structure(
+            entity_type, keyword_search, query, space_id, force_refresh
+        )
 
     @mcp.tool()
     def clickup_resolve_url(url: str) -> str:
@@ -804,6 +904,42 @@ if "clickup" not in EXCLUDED:
             file_path: Absolute path to the file to attach
         """
         return add_attachment(task_id, file_path)
+
+    @mcp.tool()
+    def clickup_get_doc_pages(doc_id: str, max_page_depth: int = -1) -> str:
+        """
+        Fetch the page listing (table of contents) for a ClickUp document.
+
+        A document contains any number of pages, each of which can have any number of
+        nested subpages to arbitrary depth. This returns the full tree structure.
+        Use clickup_search_structure with entity_type="Document" to find the doc_id first.
+
+        Args:
+            doc_id:          ClickUp document ID (e.g. "dk07c-42037")
+            max_page_depth:  Max depth of nested pages to return. Use -1 (default) for unlimited depth.
+
+        Returns:
+            JSON with the nested page listing including page IDs, names, and hierarchy.
+        """
+        return _get_doc_pages(doc_id, max_page_depth)
+
+    @mcp.tool()
+    def clickup_get_page_content(doc_id: str, page_id: str) -> str:
+        """
+        Get the markdown content of a single page within a ClickUp document.
+
+        This returns the actual page content (body text) in markdown format, not metadata.
+        Use clickup_get_doc_pages first to browse the document's page listing and find
+        the page_id you need, then call this to read that page's content.
+
+        Args:
+            doc_id:  ClickUp document ID (e.g. "dk07c-42037")
+            page_id: ClickUp page ID within the document
+
+        Returns:
+            JSON with the page content in markdown format.
+        """
+        return _get_page_content(doc_id, page_id)
 
 
 if __name__ == "__main__":

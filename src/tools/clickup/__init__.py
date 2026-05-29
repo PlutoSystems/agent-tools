@@ -187,12 +187,14 @@ def get_hierarchy_index(force_refresh: bool = False) -> list[dict[str, Any]]:
     index: list[dict[str, Any]] = []
 
     for space in hierarchy.get("spaces", []):
+        space_id = space["id"]
         index.append(
             {
                 "type": "space",
-                "id": space["id"],
+                "id": space_id,
                 "name": space["name"],
                 "path": space["name"],
+                "space_id": space_id,
             }
         )
         for doc in space.get("docs", []):
@@ -202,6 +204,7 @@ def get_hierarchy_index(force_refresh: bool = False) -> list[dict[str, Any]]:
                     "id": doc["id"],
                     "name": doc["name"],
                     "path": f"{space['name']} > {doc['name']}",
+                    "space_id": space_id,
                 }
             )
         for folder in space.get("folders", []):
@@ -211,6 +214,7 @@ def get_hierarchy_index(force_refresh: bool = False) -> list[dict[str, Any]]:
                     "id": folder["id"],
                     "name": folder["name"],
                     "path": f"{space['name']} > {folder['name']}",
+                    "space_id": space_id,
                 }
             )
             for doc in folder.get("docs", []):
@@ -220,6 +224,7 @@ def get_hierarchy_index(force_refresh: bool = False) -> list[dict[str, Any]]:
                         "id": doc["id"],
                         "name": doc["name"],
                         "path": f"{space['name']} > {folder['name']} > {doc['name']}",
+                        "space_id": space_id,
                     }
                 )
             for lst in folder.get("lists", []):
@@ -229,6 +234,7 @@ def get_hierarchy_index(force_refresh: bool = False) -> list[dict[str, Any]]:
                         "id": lst["id"],
                         "name": lst["name"],
                         "path": f"{space['name']} > {folder['name']} > {lst['name']}",
+                        "space_id": space_id,
                     }
                 )
         for lst in space.get("lists", []):
@@ -238,6 +244,7 @@ def get_hierarchy_index(force_refresh: bool = False) -> list[dict[str, Any]]:
                     "id": lst["id"],
                     "name": lst["name"],
                     "path": f"{space['name']} > {lst['name']}",
+                    "space_id": space_id,
                 }
             )
 

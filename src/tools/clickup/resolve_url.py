@@ -85,6 +85,7 @@ def resolve_clickup_url(url: str) -> str:
         JSON with the resolved hierarchy path, e.g.:
         { "hierarchy": [ { "type": "space", "id": "...", "name": "..." }, ... ] }
     """
+    url = url.split("?")[0]
     m = re.match(r"https://app\.clickup\.com/(\d+)/v/(.+)", url)
     if not m:
         return json.dumps({"error": "Not a valid ClickUp app URL"})

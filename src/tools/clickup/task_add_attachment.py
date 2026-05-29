@@ -5,7 +5,7 @@ import requests
 from tools.clickup import CLICKUP_API_KEY, BASE_URL
 
 
-def task_add_attachment(task_id: str, file_path: str) -> str:
+def add_attachment(task_id: str, file_path: str) -> str:
     if not CLICKUP_API_KEY:
         return "Error: CLICKUP_API_KEY not set"
 
@@ -31,8 +31,8 @@ def task_add_attachment(task_id: str, file_path: str) -> str:
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("Usage: python task_add_attachment.py <task_id> <file_path>")
+        print("Usage: python add_attachment.py <task_id> <file_path>")
         sys.exit(1)
 
-    result = task_add_attachment(sys.argv[1], sys.argv[2])
+    result = add_attachment(sys.argv[1], sys.argv[2])
     print(result)
