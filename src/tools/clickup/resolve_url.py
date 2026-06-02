@@ -86,6 +86,31 @@ def resolve_clickup_url(url: str) -> str:
         { "hierarchy": [ { "type": "space", "id": "...", "name": "..." }, ... ] }
     """
     url = url.split("?")[0]
+
+    # Task short URL: /t/{task_id}
+    t_match = re.match(r"https://app\.clickup\.com/t/([a-z0-9]+)", url)
+    if t_match:
+        task_id = t_match.group(1)
+        resp = requests.get(f"{BASE_URL}/task/{task_id}", headers=headers())
+        if not resp.ok:
+            return json.dumps(
+                {"error": f"Could not fetch task '{task_id}': {resp.text}"}
+            )
+        task = resp.json()
+        task_info = {
+            "type": "task",
+            "id": task.get("id"),
+            "name": task.get("name"),
+            "status": task.get("status", {}).get("status"),
+            "url": task.get("url"),
+            "list": task.get("list", {}),
+        }
+        list_id = task.get("list", {}).get("id")
+        hierarchy = load_hierarchy()
+        path = _find_path(hierarchy, list_id) if list_id else None
+        result_path = (path or []) + [task_info]
+        return json.dumps({"hierarchy": result_path}, indent=2)
+
     m = re.match(r"https://app\.clickup\.com/(\d+)/v/(.+)", url)
     if not m:
         return json.dumps({"error": "Not a valid ClickUp app URL"})

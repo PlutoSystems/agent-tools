@@ -808,6 +808,18 @@ if "clickup" not in EXCLUDED:
     from tools.clickup.task_add_attachment import add_attachment
     from tools.clickup.doc_pages import get_doc_pages as _get_doc_pages
     from tools.clickup.doc_page_content import get_page_content as _get_page_content
+    from tools.clickup.doc_create import create_doc as _create_doc
+    from tools.clickup.doc_page_create import create_page as _create_page
+    from tools.clickup.doc_page_update import update_page as _update_page
+    from tools.clickup.list_members import list_members as _list_members
+    from tools.clickup.task_list import list_tasks as _list_tasks
+    from tools.clickup.task_find_by_user import find_user_tasks as _find_user_tasks
+    from tools.clickup.task_update import update_task as _update_task
+    from tools.clickup.task_delete import delete_task as _delete_task
+    from tools.clickup.task_add_comment import add_comment as _add_comment
+    from tools.clickup.my_tasks import my_tasks as _my_tasks
+    from tools.clickup.my_tasks_add import add_personal_task as _add_personal_task
+    from tools.clickup.set_personal_list import set_personal_list as _set_personal_list
 
     @mcp.tool()
     def clickup_search_structure(
@@ -858,13 +870,15 @@ if "clickup" not in EXCLUDED:
         hierarchy cache to return the full ancestor chain.
 
         Supports all common ClickUp URL types:
+        - Task short links (/t/{task_id})
         - Folder overview (/v/o/f/{folder_id})
         - Doc/page (/v/dc/{doc_id}/...)
         - List views (/v/l/{view_id} or /v/l/{type}-{list_id}-{n})
         - Board views (/v/b/{view_id} or /v/b/li/{list_id})
 
         Args:
-            url: A ClickUp app URL (e.g. https://app.clickup.com/14254316/v/l/dk07c-60177)
+            url: A ClickUp app URL (e.g. https://app.clickup.com/t/86e1b26b5
+                 or https://app.clickup.com/14254316/v/l/dk07c-60177)
 
         Returns:
             JSON with a "hierarchy" array of { type, id, name } objects from
@@ -889,7 +903,9 @@ if "clickup" not in EXCLUDED:
             list_id: ClickUp list ID to create the task in
             name: Task name/title
             markdown_content: Task description in markdown
-            task_type: Optional custom task type name (e.g. "Bug", "Feature")
+            task_type: Optional custom task type name. Available types: "milestone",
+                       "form_response", "meeting_note", "ai_skill", "request", "bug",
+                       "setup", "meeting", "story"
             parent: Optional parent task ID to nest this as a subtask
         """
         return create_task(list_id, name, markdown_content, task_type, parent)
@@ -940,6 +956,253 @@ if "clickup" not in EXCLUDED:
             JSON with the page content in markdown format.
         """
         return _get_page_content(doc_id, page_id)
+
+    @mcp.tool()
+    def clickup_create_doc(
+        name: str,
+        parent_id: str,
+        parent_type: str = "space",
+        create_page: bool = True,
+    ) -> str:
+        """
+        Create a new ClickUp document.
+
+        Use clickup_search_structure to find the parent_id first.
+
+        Args:
+            name: Document name
+            parent_id: ID of the parent entity (space, folder, list, etc.)
+            parent_type: Type of parent — "space", "folder", "list", "everything", or "workspace"
+            create_page: Whether to create an initial blank page (default True)
+        """
+        return _create_doc(name, parent_id, parent_type, create_page)
+
+    @mcp.tool()
+    def clickup_create_page(
+        doc_id: str,
+        name: str,
+        content: str = "",
+        parent_page_id: str | None = None,
+        sub_title: str | None = None,
+    ) -> str:
+        """
+        Create a page in a ClickUp document.
+
+        Use clickup_get_doc_pages to browse existing pages and find a parent_page_id
+        if you want to create a sub-page.
+
+        Args:
+            doc_id: ClickUp document ID
+            name: Page name
+            content: Page content in markdown
+            parent_page_id: Optional parent page ID to create a sub-page under
+            sub_title: Optional page subtitle
+        """
+        return _create_page(doc_id, name, content, parent_page_id, sub_title)
+
+    @mcp.tool()
+    def clickup_update_page(
+        doc_id: str,
+        page_id: str,
+        content: str,
+        name: str | None = None,
+        sub_title: str | None = None,
+        content_edit_mode: Literal["replace", "append", "prepend"] = "replace",
+    ) -> str:
+        """
+        Update the content of a page in a ClickUp document.
+
+        Use clickup_get_doc_pages and clickup_get_page_content to find the page first.
+
+        Args:
+            doc_id: ClickUp document ID
+            page_id: ClickUp page ID
+            content: New page content in markdown
+            name: Optionally update the page name
+            sub_title: Optionally update the page subtitle
+            content_edit_mode: How to apply content — "replace" (default), "append", or "prepend"
+        """
+        return _update_page(
+            doc_id, page_id, content, name, sub_title, content_edit_mode
+        )
+
+    @mcp.tool()
+    def clickup_list_tasks(
+        list_id: str,
+        page: int = 0,
+        include_closed: bool = False,
+    ) -> str:
+        """
+        List tasks in a ClickUp list.
+
+        Use clickup_search_structure to find the list_id first.
+
+        Args:
+            list_id: ClickUp list ID
+            page: Page number for pagination (default 0)
+            include_closed: Include tasks with closed status (default False)
+        """
+        return _list_tasks(list_id, page, include_closed)
+
+    @mcp.tool()
+    def clickup_find_user_tasks(
+        user_id: str,
+        include_closed: bool = False,
+        page: int = 0,
+    ) -> str:
+        """
+        Find tasks assigned to a specific user across the workspace.
+
+        Use clickup_list_members to find the user_id first.
+
+        Args:
+            user_id: ClickUp user ID
+            include_closed: Include tasks with closed status (default False)
+            page: Page number for pagination (default 0)
+        """
+        return _find_user_tasks(user_id, include_closed, page)
+
+    @mcp.tool()
+    def clickup_update_task(
+        task_id: str,
+        name: str | None = None,
+        description: str | None = None,
+        status: str | None = None,
+        priority: int | None = None,
+        due_date: int | None = None,
+        assignees_add: list[int] | None = None,
+        assignees_rem: list[int] | None = None,
+        task_type: str | None = None,
+        tags_add: list[str] | None = None,
+        tags_rem: list[str] | None = None,
+    ) -> str:
+        """
+        Update a ClickUp task. Only provided fields are changed.
+
+        Args:
+            task_id: ClickUp task ID
+            name: New task name
+            description: New description in markdown
+            status: New status (e.g. "Open", "In Progress", "Closed")
+            priority: Priority level (1=urgent, 2=high, 3=normal, 4=low)
+            due_date: Due date as Unix timestamp in milliseconds
+            assignees_add: List of user IDs to add as assignees
+            assignees_rem: List of user IDs to remove as assignees
+            task_type: Custom task type name. Available types: "milestone", "form_response",
+                       "meeting_note", "ai_skill", "request", "bug", "setup", "meeting", "story"
+            tags_add: List of tag names to add (auto-lowercased; ClickUp stores tags in lowercase)
+            tags_rem: List of tag names to remove (auto-lowercased; must match exactly)
+        """
+        return _update_task(
+            task_id,
+            name,
+            description,
+            status,
+            priority,
+            due_date,
+            assignees_add,
+            assignees_rem,
+            task_type,
+            tags_add,
+            tags_rem,
+        )
+
+    @mcp.tool()
+    def clickup_delete_task(task_id: str) -> str:
+        """
+        Delete a ClickUp task.
+
+        Args:
+            task_id: ClickUp task ID to delete
+        """
+        return _delete_task(task_id)
+
+    @mcp.tool()
+    def clickup_add_comment(
+        task_id: str,
+        comment_text: str,
+        assignee: int | None = None,
+        notify_all: bool = False,
+    ) -> str:
+        """
+        Add a comment to a ClickUp task.
+
+        Args:
+            task_id: ClickUp task ID
+            comment_text: The comment text
+            assignee: Optional user ID to assign the comment to
+            notify_all: Whether to notify all assignees (default False)
+        """
+        return _add_comment(task_id, comment_text, assignee, notify_all)
+
+    @mcp.tool()
+    def clickup_list_members() -> str:
+        """
+        List all members in the ClickUp workspace.
+
+        Returns a JSON array of users with their id, username, email, and role.
+        """
+        return _list_members()
+
+    @mcp.tool()
+    def clickup_my_tasks(
+        include_closed: bool = False,
+        page: int = 0,
+    ) -> str:
+        """
+        Read the current user's ClickUp Personal List tasks.
+
+        Requires the Personal List ID to be configured via clickup_set_personal_list first.
+        If not configured, returns an error with instructions.
+
+        Args:
+            include_closed: Include completed/closed tasks (default False)
+            page: Page number for pagination (default 0)
+        """
+        return _my_tasks(include_closed, page)
+
+    @mcp.tool()
+    def clickup_add_personal_task(
+        name: str,
+        description: str = "",
+        task_type: str | None = None,
+        priority: int | None = None,
+        due_date: int | None = None,
+    ) -> str:
+        """
+        Add a task to the current user's ClickUp Personal List.
+
+        This creates a task in the user's personal task list (the hidden "Personal List"
+        visible at /my-work in ClickUp) and auto-assigns it to the current user.
+
+        Only use this tool when the user specifically asks to add something to their
+        personal task list, or asks to create a personal task without specifying a
+        particular project list. For tasks in a specific list, use clickup_create_task.
+
+        Args:
+            name: Task name
+            description: Task description in markdown
+            task_type: Optional custom task type. Available types: "milestone",
+                       "form_response", "meeting_note", "ai_skill", "request", "bug",
+                       "setup", "meeting", "story"
+            priority: Priority level (1=urgent, 2=high, 3=normal, 4=low)
+            due_date: Due date as Unix timestamp in milliseconds
+        """
+        return _add_personal_task(name, description, task_type, priority, due_date)
+
+    @mcp.tool()
+    def clickup_set_personal_list(list_id_or_url: str) -> str:
+        """
+        Save the user's ClickUp Personal List ID for use by my_tasks and add_personal_task.
+
+        ClickUp hides personal spaces from the API, so the list ID must be configured
+        manually. The user can find it by opening their Personal List in ClickUp and
+        copying the URL or list ID.
+
+        Args:
+            list_id_or_url: A numeric list ID or a ClickUp URL containing /li/<id>
+        """
+        return _set_personal_list(list_id_or_url)
 
 
 if __name__ == "__main__":
