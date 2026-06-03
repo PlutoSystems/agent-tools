@@ -81,23 +81,23 @@ def analyze_qa_recording(
     os.makedirs(imgs_dir, exist_ok=True)
     os.makedirs(clips_dir, exist_ok=True)
 
-    print("1. Uploading video to Gemini...")
+    print("1. Uploading video to Gemini...", file=sys.stderr)
     client = genai.Client()
     video_file = client.files.upload(file=video_path)
 
     try:
-        print("2. Waiting for file processing...")
+        print("2. Waiting for file processing...", file=sys.stderr)
         while video_file.state.name == "PROCESSING":
             time.sleep(5)
             video_file = client.files.get(name=video_file.name)
-            print(f"   State: {video_file.state.name}")
+            print(f"   State: {video_file.state.name}", file=sys.stderr)
 
         if video_file.state.name != "ACTIVE":
             return json.dumps(
                 {"error": f"File processing failed with state {video_file.state.name}"}
             )
 
-        print("3. Analyzing video and transcript with Gemini Flash...")
+        print("3. Analyzing video and transcript with Gemini Flash...", file=sys.stderr)
         response = client.models.generate_content(
             model="gemini-flash-latest",
             contents=[
@@ -112,7 +112,8 @@ def analyze_qa_recording(
 
         usage = response.usage_metadata
         print(
-            f"   Tokens — prompt: {usage.prompt_token_count}, response: {usage.candidates_token_count}, total: {usage.total_token_count}"
+            f"   Tokens — prompt: {usage.prompt_token_count}, response: {usage.candidates_token_count}, total: {usage.total_token_count}",
+            file=sys.stderr,
         )
 
         result = QAResult.model_validate_json(response.text)
@@ -121,9 +122,9 @@ def analyze_qa_recording(
         results_path = os.path.join(results_dir, "issues.json")
         with open(results_path, "w", encoding="utf-8") as f:
             json.dump(issues, f, indent=2)
-        print(f"3. Saved {len(issues)} issues to {results_path}")
+        print(f"3. Saved {len(issues)} issues to {results_path}", file=sys.stderr)
 
-        print("4. Extracting screenshots and clips...")
+        print("4. Extracting screenshots and clips...", file=sys.stderr)
         for issue in issues:
             start_sec = time_to_seconds(issue["start_time"])
             end_sec = time_to_seconds(issue["end_time"])
@@ -134,7 +135,7 @@ def analyze_qa_recording(
             clip_filename = f"{category}_{issue['start_time'].replace(':', '-')}.mp4"
             clip_path = os.path.join(clips_dir, clip_filename)
             clip_result = extract_clip(video_path, clip_start, end_sec, clip_path)
-            print(f"   {clip_result}")
+            print(f"   {clip_result}", file=sys.stderr)
             issue["clip"] = clip_path
 
             issue["screenshots"] = []
@@ -156,7 +157,7 @@ def analyze_qa_recording(
                 filename = f"{category}_{ts_str}_{label}.jpg"
                 out_path = os.path.join(imgs_dir, filename)
                 frame_result = extract_frame(video_path, ts, out_path)
-                print(f"   {frame_result}")
+                print(f"   {frame_result}", file=sys.stderr)
                 issue["screenshots"].append(out_path)
 
         output = {
@@ -177,7 +178,7 @@ def analyze_qa_recording(
 
         return json.dumps(output, indent=2)
     finally:
-        print("Cleaning up uploaded file...")
+        print("Cleaning up uploaded file...", file=sys.stderr)
         try:
             client.files.delete(name=video_file.name)
         except Exception:
@@ -187,7 +188,7 @@ def analyze_qa_recording(
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print(
-            "Usage: python analyze_qa_recording_tool.py <video_path> <transcript_path> [meeting_name]"
+            "Usage: uv run python -m src.tools.analyze_qa_recording_tool <video_path> <transcript_path> [meeting_name]"
         )
         sys.exit(1)
 

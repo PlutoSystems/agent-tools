@@ -17,7 +17,6 @@ def create_task(
     payload: dict = {
         "name": name,
         "markdown_content": markdown_content,
-        "status": "Open",
     }
 
     if task_type:
