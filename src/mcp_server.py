@@ -691,7 +691,7 @@ if "ms_graph" not in EXCLUDED:
 
         Notes:
             - Requires MS_CLIENT_ID in .env file
-            - Auth credentials are cached in .local/auth_record.json for subsequent runs
+            - Auth credentials are cached in .local/ms_auth_record.json for subsequent runs
         """
         try:
             content = fetch_transcript(join_url, output_path or None)
