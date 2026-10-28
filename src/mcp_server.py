@@ -814,6 +814,7 @@ if "clickup" not in EXCLUDED:
     from tools.clickup.list_members import list_members as _list_members
     from tools.clickup.task_list import list_tasks as _list_tasks
     from tools.clickup.task_find_by_user import find_user_tasks as _find_user_tasks
+    from tools.clickup.task_get import get_task as _get_task
     from tools.clickup.task_update import update_task as _update_task
     from tools.clickup.task_delete import delete_task as _delete_task
     from tools.clickup.task_add_comment import add_comment as _add_comment
@@ -870,7 +871,8 @@ if "clickup" not in EXCLUDED:
         hierarchy cache to return the full ancestor chain.
 
         Supports all common ClickUp URL types:
-        - Task short links (/t/{task_id})
+        - Task links (/t/{task_id} or /t/{workspace_id}/{task_id}); includes the
+          task description. Use clickup_get_task for full task details.
         - Folder overview (/v/o/f/{folder_id})
         - Doc/page (/v/dc/{doc_id}/...)
         - List views (/v/l/{view_id} or /v/l/{type}-{list_id}-{n})
@@ -1043,6 +1045,19 @@ if "clickup" not in EXCLUDED:
             include_closed: Include tasks with closed status (default False)
         """
         return _list_tasks(list_id, page, include_closed)
+
+    @mcp.tool()
+    def clickup_get_task(task_id: str) -> str:
+        """
+        Get a single ClickUp task including its description (markdown), status,
+        assignees, tags, due date, parent, subtasks and list.
+
+        Args:
+            task_id: ClickUp task ID, custom task ID (e.g. "PLT-123"), or a task URL
+                     (https://app.clickup.com/t/{task_id} or
+                     https://app.clickup.com/t/{workspace_id}/{task_id})
+        """
+        return _get_task(task_id)
 
     @mcp.tool()
     def clickup_find_user_tasks(

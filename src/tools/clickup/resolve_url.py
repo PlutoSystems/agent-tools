@@ -4,6 +4,7 @@ import json
 import requests
 from typing import Any
 from tools.clickup import headers, BASE_URL, load_hierarchy
+from tools.clickup.task_get import fetch_task
 
 # ClickUp parent type enum values (from the view API's parent.type field)
 _PARENT_TYPE_WORKSPACE = 1
@@ -87,20 +88,16 @@ def resolve_clickup_url(url: str) -> str:
     """
     url = url.split("?")[0]
 
-    # Task short URL: /t/{task_id}
-    t_match = re.match(r"https://app\.clickup\.com/t/([a-z0-9]+)", url)
-    if t_match:
-        task_id = t_match.group(1)
-        resp = requests.get(f"{BASE_URL}/task/{task_id}", headers=headers())
-        if not resp.ok:
-            return json.dumps(
-                {"error": f"Could not fetch task '{task_id}': {resp.text}"}
-            )
-        task = resp.json()
+    # Task URL: /t/{task_id} or /t/{workspace_id}/{task_id}
+    if re.match(r"https://app\.clickup\.com/t/", url):
+        task, err = fetch_task(url)
+        if err or task is None:
+            return json.dumps({"error": err})
         task_info = {
             "type": "task",
             "id": task.get("id"),
             "name": task.get("name"),
+            "description": task.get("markdown_description") or task.get("description"),
             "status": task.get("status", {}).get("status"),
             "url": task.get("url"),
             "list": task.get("list", {}),
